@@ -2,15 +2,13 @@ pipeline {
     agent any
 
     environment {
-        AWS_DEFAULT_REGION = "us-east-1"
-        AWS_CREDENTIALS_ID = "aws-jenkins-credentials"
+        AWS_CREDENTIALS_ID = 'aws-credentials' // Replace with your Jenkins AWS credentials ID
     }
 
     stages {
         stage('Checkout') {
             steps {
-                deleteDir()  // Clean workspace before checkout
-                git url: 'https://github.com/rajivsharma92/terraform-caps-project.git', branch: 'main'
+                git 'https://github.com/Manjyyot/JenkinsPipeline.git'
             }
         }
 
@@ -18,35 +16,19 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: AWS_CREDENTIALS_ID
+                    credentialsId: env.AWS_CREDENTIALS_ID
                 ]]) {
-                    sh '''
-                        echo "Verifying AWS credentials..."
-                        aws sts get-caller-identity
-                    '''
+                    sh 'aws sts get-caller-identity'
                 }
             }
         }
 
         stage('Initialize Terraform') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: AWS_CREDENTIALS_ID
-                ]]) {
-                    dir('terraform-eks-project') {
-                        sh '''
-                            terraform init \
-                              -backend-config="bucket=mr-ci-cd" \
-                              -backend-config="region=$AWS_DEFAULT_REGION" \
-                              -input=false
-
-                            if [ $? -ne 0 ]; then
-                                echo "Terraform initialization failed."
-                                exit 1
-                            fi
-                        '''
-                    }
+                dir('terraform-eks-project') {
+                    sh '''
+                        terraform init -backend-config=bucket=mr-ci-cd -backend-config=region=us-east-1 -input=false
+                    '''
                 }
             }
         }
@@ -55,15 +37,17 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: AWS_CREDENTIALS_ID
+                    credentialsId: env.AWS_CREDENTIALS_ID
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
-                            terraform plan -input=false
-                            if [ $? -ne 0 ]; then
-                                echo "Terraform plan failed."
-                                exit 1
-                            fi
+                            terraform plan -input=false \
+                                -var="cidr_block=10.0.0.0/16" \
+                                -var="public_subnets=[10.0.1.0/24,10.0.2.0/24]" \
+                                -var="private_subnets=[10.0.3.0/24,10.0.4.0/24]" \
+                                -var="azs=[us-east-1a,us-east-1b]" \
+                                -var="environment=production" \
+                                -var="cluster_name=eks-cluster"
                         '''
                     }
                 }
@@ -74,15 +58,17 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: AWS_CREDENTIALS_ID
+                    credentialsId: env.AWS_CREDENTIALS_ID
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
-                            terraform apply -auto-approve -input=false
-                            if [ $? -ne 0 ]; then
-                                echo "Terraform apply failed."
-                                exit 1
-                            fi
+                            terraform apply -input=false -auto-approve \
+                                -var="cidr_block=10.0.0.0/16" \
+                                -var="public_subnets=[10.0.1.0/24,10.0.2.0/24]" \
+                                -var="private_subnets=[10.0.3.0/24,10.0.4.0/24]" \
+                                -var="azs=[us-east-1a,us-east-1b]" \
+                                -var="environment=production" \
+                                -var="cluster_name=eks-cluster"
                         '''
                     }
                 }
@@ -91,19 +77,8 @@ pipeline {
 
         stage('Terraform Output') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: AWS_CREDENTIALS_ID
-                ]]) {
-                    dir('terraform-eks-project') {
-                        sh '''
-                            terraform output
-                            if [ $? -ne 0 ]; then
-                                echo "Terraform output failed."
-                                exit 1
-                            fi
-                        '''
-                    }
+                dir('terraform-eks-project') {
+                    sh 'terraform output'
                 }
             }
         }
@@ -111,10 +86,7 @@ pipeline {
 
     post {
         always {
-            cleanWs()  // Clean workspace after every run
-        }
-        failure {
-            echo 'Pipeline failed. Check the logs for details.'
+            cleanWs()
         }
     }
 }

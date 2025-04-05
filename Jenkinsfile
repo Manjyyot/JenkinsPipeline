@@ -2,33 +2,11 @@ pipeline {
     agent any
 
     environment {
-        TF_VAR_region = "us-east-1"
+        AWS_REGION = 'us-east-1'
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                git url: 'https://github.com/rajivsharma92/terraform-caps-project.git', branch: 'main'
-            }
-        }
-
-        stage('Set Up AWS Credentials') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-jenkins-credentials' // using your provided ID
-                ]]) {
-                    sh '''
-                        echo "✅ Verifying AWS credentials..."
-                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                        aws sts get-caller-identity
-                    '''
-                }
-            }
-        }
-
-        stage('Initialize Terraform') {
+        stage('Terraform Init') {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
@@ -36,40 +14,46 @@ pipeline {
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_DEFAULT_REGION=us-east-1
-
-                            terraform init \
-                              -backend-config="bucket=mr-ci-cd" \
-                              -backend-config="region=us-east-1" \
-                              -input=false
+                            echo "🔧 Running terraform init..."
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            terraform init -backend-config="bucket=mr-ci-cd" -backend-config="region=us-east-1" -input=false
                         '''
                     }
                 }
             }
         }
 
-        stage('Terraform Format and Validate') {
-            steps {
-                dir('terraform-eks-project') {
-                    sh 'terraform fmt -check && terraform validate'
-                }
-            }
-        }
-
         stage('Terraform Plan') {
             steps {
-                dir('terraform-eks-project') {
-                    sh 'terraform plan -input=false'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-jenkins-credentials'
+                ]]) {
+                    dir('terraform-eks-project') {
+                        sh '''
+                            echo "📦 Running terraform plan..."
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            terraform plan -out=tfplan
+                        '''
+                    }
                 }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir('terraform-eks-project') {
-                    sh 'terraform apply -auto-approve -input=false'
+                input message: "🟢 Apply the Terraform plan?"
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-jenkins-credentials'
+                ]]) {
+                    dir('terraform-eks-project') {
+                        sh '''
+                            echo "🚀 Applying terraform plan..."
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            terraform apply -auto-approve tfplan
+                        '''
+                    }
                 }
             }
         }
@@ -77,10 +61,10 @@ pipeline {
 
     post {
         failure {
-            echo 'Pipeline failed. Please check logs.'
+            echo "❌ Pipeline failed. Please check the logs."
         }
-        always {
-            cleanWs()
+        success {
+            echo "✅ Terraform deployed successfully!"
         }
     }
 }

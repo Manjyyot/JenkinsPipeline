@@ -2,13 +2,18 @@ pipeline {
     agent any
 
     environment {
-        TF_VAR_region = "us-east-1"
+        AWS_DEFAULT_REGION = "us-east-1"
         AWS_CREDENTIALS_ID = "aws-jenkins-credentials"
+    }
+
+    options {
+        cleanWs()  // Ensure a clean workspace before starting
     }
 
     stages {
         stage('Checkout') {
             steps {
+                deleteDir()  // Fresh start by deleting the workspace
                 git url: 'https://github.com/rajivsharma92/terraform-caps-project.git', branch: 'main'
             }
         }
@@ -20,7 +25,7 @@ pipeline {
                     credentialsId: AWS_CREDENTIALS_ID
                 ]]) {
                     sh '''
-                        echo "✅ Verifying AWS credentials..."
+                        echo "Verifying AWS credentials..."
                         aws sts get-caller-identity
                     '''
                 }
@@ -35,10 +40,19 @@ pipeline {
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+
                             terraform init \
                               -backend-config="bucket=mr-ci-cd" \
-                              -backend-config="region=us-east-1" \
+                              -backend-config="region=$AWS_DEFAULT_REGION" \
                               -input=false
+
+                            if [ $? -ne 0 ]; then
+                                echo "Terraform initialization failed."
+                                exit 1
+                            fi
                         '''
                     }
                 }
@@ -47,24 +61,69 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                dir('terraform-eks-project') {
-                    sh 'terraform plan -input=false'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: AWS_CREDENTIALS_ID
+                ]]) {
+                    dir('terraform-eks-project') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+
+                            terraform plan -input=false
+                            if [ $? -ne 0 ]; then
+                                echo "Terraform plan failed."
+                                exit 1
+                            fi
+                        '''
+                    }
                 }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir('terraform-eks-project') {
-                    sh 'terraform apply -auto-approve -input=false'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: AWS_CREDENTIALS_ID
+                ]]) {
+                    dir('terraform-eks-project') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+
+                            terraform apply -auto-approve -input=false
+                            if [ $? -ne 0 ]; then
+                                echo "Terraform apply failed."
+                                exit 1
+                            fi
+                        '''
+                    }
                 }
             }
         }
 
         stage('Terraform Output') {
             steps {
-                dir('terraform-eks-project') {
-                    sh 'terraform output'
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: AWS_CREDENTIALS_ID
+                ]]) {
+                    dir('terraform-eks-project') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+
+                            terraform output
+                            if [ $? -ne 0 ]; then
+                                echo "Terraform output failed."
+                                exit 1
+                            fi
+                        '''
+                    }
                 }
             }
         }
@@ -72,10 +131,10 @@ pipeline {
 
     post {
         failure {
-            echo '❌ Pipeline failed. Please check logs.'
+            echo 'Pipeline failed. Check the logs for details.'
         }
         always {
-            cleanWs()
+            cleanWs()  // Clean workspace after every run
         }
     }
 }

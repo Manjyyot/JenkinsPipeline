@@ -6,10 +6,6 @@ pipeline {
         AWS_CREDENTIALS_ID = "aws-jenkins-credentials"
     }
 
-    options {
-        cleanWs()  // Ensure a clean workspace before starting
-    }
-
     stages {
         stage('Checkout') {
             steps {
@@ -130,11 +126,11 @@ pipeline {
     }
 
     post {
-        failure {
-            echo 'Pipeline failed. Check the logs for details.'
-        }
         always {
             cleanWs()  // Clean workspace after every run
+        }
+        failure {
+            echo 'Pipeline failed. Check the logs for details.'
         }
     }
 }

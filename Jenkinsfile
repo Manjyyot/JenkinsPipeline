@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        AWS_CREDENTIALS_ID = 'aws-credentials' // Replace with your Jenkins AWS credentials ID
+        AWS_CREDENTIALS_ID = 'aws-jenkins-credentials'
     }
 
     stages {

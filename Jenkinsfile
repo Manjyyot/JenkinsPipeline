@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                deleteDir()  // Fresh start by deleting the workspace
+                deleteDir()  // Clean workspace before checkout
                 git url: 'https://github.com/rajivsharma92/terraform-caps-project.git', branch: 'main'
             }
         }
@@ -36,10 +36,6 @@ pipeline {
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
-
                             terraform init \
                               -backend-config="bucket=mr-ci-cd" \
                               -backend-config="region=$AWS_DEFAULT_REGION" \
@@ -63,10 +59,6 @@ pipeline {
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
-
                             terraform plan -input=false
                             if [ $? -ne 0 ]; then
                                 echo "Terraform plan failed."
@@ -86,10 +78,6 @@ pipeline {
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
-
                             terraform apply -auto-approve -input=false
                             if [ $? -ne 0 ]; then
                                 echo "Terraform apply failed."
@@ -109,10 +97,6 @@ pipeline {
                 ]]) {
                     dir('terraform-eks-project') {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
-
                             terraform output
                             if [ $? -ne 0 ]; then
                                 echo "Terraform output failed."

@@ -2,13 +2,7 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'  // Change this to your AWS region
-        S3_BUCKET = 'mr-ci-cd'
-    }
-
-    options {
-        skipDefaultCheckout(true)
-        timestamps()
+        TF_VAR_region = "us-east-1"
     }
 
     stages {
@@ -22,22 +16,36 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-jenkins-credentials'
+                    credentialsId: 'aws-jenkins-credentials' // using your provided ID
                 ]]) {
-                    sh 'aws sts get-caller-identity'
+                    sh '''
+                        echo "✅ Verifying AWS credentials..."
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        aws sts get-caller-identity
+                    '''
                 }
             }
         }
 
         stage('Initialize Terraform') {
             steps {
-                dir('terraform-eks-project') {
-                    sh """
-                        terraform init \
-                          -backend-config="bucket=${S3_BUCKET}" \
-                          -backend-config="region=${AWS_REGION}" \
-                          -input=false
-                    """
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-jenkins-credentials'
+                ]]) {
+                    dir('terraform-eks-project') {
+                        sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                            export AWS_DEFAULT_REGION=us-east-1
+
+                            terraform init \
+                              -backend-config="bucket=mr-ci-cd" \
+                              -backend-config="region=us-east-1" \
+                              -input=false
+                        '''
+                    }
                 }
             }
         }
@@ -45,8 +53,7 @@ pipeline {
         stage('Terraform Format and Validate') {
             steps {
                 dir('terraform-eks-project') {
-                    sh 'terraform fmt -check'
-                    sh 'terraform validate'
+                    sh 'terraform fmt -check && terraform validate'
                 }
             }
         }
@@ -54,7 +61,7 @@ pipeline {
         stage('Terraform Plan') {
             steps {
                 dir('terraform-eks-project') {
-                    sh 'terraform plan -out=tfplan'
+                    sh 'terraform plan -input=false'
                 }
             }
         }
@@ -62,21 +69,17 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir('terraform-eks-project') {
-                    input message: "Do you want to apply the plan?", ok: "Apply"
-                    sh 'terraform apply -auto-approve tfplan'
+                    sh 'terraform apply -auto-approve -input=false'
                 }
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Pipeline completed successfully.'
-        }
         failure {
-            echo '❌ Pipeline failed. Please check logs.'
+            echo 'Pipeline failed. Please check logs.'
         }
-        cleanup {
+        always {
             cleanWs()
         }
     }

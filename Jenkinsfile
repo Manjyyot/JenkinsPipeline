@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/Manjyyot/JenkinsPipeline.git'
+                git 'https://github.com/rajivsharma92/terraform-caps-project.git'
             }
         }
 

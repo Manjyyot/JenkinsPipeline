@@ -2,12 +2,8 @@ pipeline {
     agent any
 
     environment {
-        AWS_CREDENTIALS_ID = 'aws-jenkins-credentials'
-        TF_VARS_FILE = 'terraform-caps-project/terraform-eks-project/terraform.tfvars'
-    }
-
-    options {
-        timestamps()
+        AWS_REGION = 'us-east-1'
+        TERRAFORM_DIR = 'terraform-caps-project/terraform-eks-project'
     }
 
     stages {
@@ -17,33 +13,41 @@ pipeline {
             }
         }
 
-        stage('Set Up AWS Credentials') {
+        stage('Terraform Init') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: env.AWS_CREDENTIALS_ID
-                ]]) {
-                    sh 'aws sts get-caller-identity'
+                script {
+                    if (!fileExists("${TERRAFORM_DIR}/main.tf")) {
+                        error("No Terraform configuration found in ${TERRAFORM_DIR}. Please check your repo structure.")
+                    }
                 }
-            }
-        }
 
-        stage('Initialize Terraform') {
-            steps {
-                dir('terraform-caps-project/terraform-eks-project') {
-                    sh 'terraform init'
+                withCredentials([[ 
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-jenkins-credentials' 
+                ]]) {
+                    dir("${TERRAFORM_DIR}") {
+                        sh '''
+                            echo "Running terraform init..."
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            terraform init -backend-config="bucket=mr-ci-cd" -backend-config="region=$AWS_REGION" -input=false
+                        '''
+                    }
                 }
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: env.AWS_CREDENTIALS_ID
+                withCredentials([[ 
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-jenkins-credentials' 
                 ]]) {
-                    dir('terraform-caps-project/terraform-eks-project') {
-                        sh "terraform plan -var-file=${env.TF_VARS_FILE}"
+                    dir("${TERRAFORM_DIR}") {
+                        sh '''
+                            echo "Running terraform plan..."
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            terraform plan -var-file=terraform.tfvars -out=tfplan
+                        '''
                     }
                 }
             }
@@ -51,12 +55,17 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: env.AWS_CREDENTIALS_ID
+                input message: "Approve apply step?"
+                withCredentials([[ 
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-jenkins-credentials' 
                 ]]) {
-                    dir('terraform-caps-project/terraform-eks-project') {
-                        sh "terraform apply -input=false -auto-approve -var-file=${env.TF_VARS_FILE}"
+                    dir("${TERRAFORM_DIR}") {
+                        sh '''
+                            echo "Applying Terraform plan..."
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            terraform apply -auto-approve tfplan
+                        '''
                     }
                 }
             }
@@ -64,16 +73,28 @@ pipeline {
 
         stage('Terraform Output') {
             steps {
-                dir('terraform-caps-project/terraform-eks-project') {
-                    sh 'terraform output'
+                withCredentials([[ 
+                    $class: 'AmazonWebServicesCredentialsBinding', 
+                    credentialsId: 'aws-jenkins-credentials' 
+                ]]) {
+                    dir("${TERRAFORM_DIR}") {
+                        sh '''
+                            echo "Fetching Terraform outputs..."
+                            export AWS_DEFAULT_REGION=$AWS_REGION
+                            terraform output
+                        '''
+                    }
                 }
             }
         }
     }
 
     post {
-        always {
-            cleanWs()
+        failure {
+            echo "Pipeline failed. Please check the logs."
+        }
+        success {
+            echo "Terraform deployment completed successfully!"
         }
     }
 }

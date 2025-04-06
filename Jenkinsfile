@@ -6,21 +6,20 @@ pipeline {
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Clone Repo') {
             steps {
-                git url: 'https://github.com/rajivsharma92/terraform-caps-project.git', branch: 'main'
+                git branch: 'main', url: 'https://github.com/rajivsharma92/terraform-caps-project.git'
             }
         }
 
         stage('Locate Terraform Directory') {
             steps {
                 script {
-                    def tfDir = sh(script: "find . -type f -name '*.tf' | head -n 1 | xargs dirname", returnStdout: true).trim()
-                    if (!tfDir) {
-                        error("No Terraform files found in repository.")
-                    }
-                    env.TERRAFORM_DIR = tfDir
-                    echo "Terraform files located in directory: ${env.TERRAFORM_DIR}"
+                    terraformDir = sh(
+                        script: 'find . -type f -name "*.tf" | head -n 1 | xargs dirname',
+                        returnStdout: true
+                    ).trim()
+                    echo "Terraform files located in: ${terraformDir}"
                 }
             }
         }
@@ -29,11 +28,16 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds'
+                    credentialsId: 'aws-jenkins-credentials'
                 ]]) {
-                    dir("${env.TERRAFORM_DIR}") {
+                    dir(terraformDir) {
                         withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
-                            sh 'terraform init -backend-config="bucket=mr-ci-cd" -backend-config="region=us-east-1" -input=false'
+                            sh '''
+                                terraform init \
+                                -backend-config="bucket=mr-ci-cd" \
+                                -backend-config="region=${AWS_REGION}" \
+                                -input=false
+                            '''
                         }
                     }
                 }
@@ -44,11 +48,15 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds'
+                    credentialsId: 'aws-jenkins-credentials'
                 ]]) {
-                    dir("${env.TERRAFORM_DIR}") {
+                    dir(terraformDir) {
                         withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
-                            sh 'terraform plan -out=tfplan'
+                            sh '''
+                                terraform plan \
+                                -var-file=terraform.tfvars \
+                                -out=tfplan
+                            '''
                         }
                     }
                 }
@@ -57,11 +65,12 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
+                input "Approve Apply?"
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds'
+                    credentialsId: 'aws-jenkins-credentials'
                 ]]) {
-                    dir("${env.TERRAFORM_DIR}") {
+                    dir(terraformDir) {
                         withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
                             sh 'terraform apply -auto-approve tfplan'
                         }
@@ -74,9 +83,9 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds'
+                    credentialsId: 'aws-jenkins-credentials'
                 ]]) {
-                    dir("${env.TERRAFORM_DIR}") {
+                    dir(terraformDir) {
                         withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
                             sh 'terraform output'
                         }
@@ -88,7 +97,10 @@ pipeline {
 
     post {
         failure {
-            echo 'Pipeline failed. Please check the logs.'
+            echo 'Pipeline failed. Check the logs for details.'
+        }
+        cleanup {
+            cleanWs()
         }
     }
 }

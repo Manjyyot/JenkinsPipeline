@@ -4,13 +4,19 @@ pipeline {
     environment {
         AWS_CREDENTIALS_ID = 'aws-jenkins-credentials'
         ENVIRONMENT = 'test'
-        TF_VARS_FILE = 'terraform-caps-project/terraform-eks-project/terraform.tfvars'
+        TF_VARS_FILE = 'terraform-eks-project/terraform.tfvars'  // Updated path
     }
 
     stages {
         stage('Checkout') {
             steps {
                 git 'https://github.com/rajivsharma92/terraform-caps-project.git'
+            }
+        }
+
+        stage('Check Workspace') {
+            steps {
+                sh 'ls -R'  // List all files in the workspace to ensure correct paths
             }
         }
 

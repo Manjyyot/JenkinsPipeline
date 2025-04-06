@@ -3,6 +3,11 @@ pipeline {
 
     environment {
         AWS_CREDENTIALS_ID = 'aws-jenkins-credentials'
+        TF_VARS_FILE = 'terraform-caps-project/terraform-eks-project/terraform.tfvars'
+    }
+
+    options {
+        timestamps()
     }
 
     stages {
@@ -38,7 +43,7 @@ pipeline {
                     credentialsId: env.AWS_CREDENTIALS_ID
                 ]]) {
                     dir('terraform-caps-project/terraform-eks-project') {
-                        sh 'terraform plan -var-file=terraform.tfvars'
+                        sh "terraform plan -var-file=${env.TF_VARS_FILE}"
                     }
                 }
             }
@@ -51,7 +56,7 @@ pipeline {
                     credentialsId: env.AWS_CREDENTIALS_ID
                 ]]) {
                     dir('terraform-caps-project/terraform-eks-project') {
-                        sh 'terraform apply -input=false -auto-approve -var-file=terraform.tfvars'
+                        sh "terraform apply -input=false -auto-approve -var-file=${env.TF_VARS_FILE}"
                     }
                 }
             }

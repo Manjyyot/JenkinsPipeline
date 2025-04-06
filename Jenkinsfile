@@ -3,13 +3,13 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-1'
-        TERRAFORM_DIR = 'terraform-eks-project'
+        TERRAFORM_DIR = 'terraform-caps-project/terraform-eks-project'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Clone Repository') {
             steps {
-                checkout scm
+                git url: 'https://github.com/rajivsharma92/terraform-caps-project.git'
             }
         }
 
@@ -47,7 +47,7 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                input message: "Approve apply"
+                input message: "Approve to apply?"
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-jenkins-credentials'

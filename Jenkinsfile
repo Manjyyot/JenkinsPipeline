@@ -53,23 +53,23 @@ pipeline {
             }
         }
 
-        stage('Terraform Apply') {
-            steps {
-                input message: "Approve apply step?"
-                withCredentials([[ 
-                    $class: 'AmazonWebServicesCredentialsBinding', 
-                    credentialsId: 'aws-jenkins-credentials' 
-                ]]) {
-                    dir("${TERRAFORM_DIR}") {
-                        sh '''
-                            echo "Applying Terraform plan..."
-                            export AWS_DEFAULT_REGION=$AWS_REGION
-                            terraform apply -auto-approve tfplan
-                        '''
-                    }
-                }
-            }
-        }
+        // stage('Terraform Apply') {
+        //     steps {
+        //         input message: "Approve apply step?"
+        //         withCredentials([[ 
+        //             $class: 'AmazonWebServicesCredentialsBinding', 
+        //             credentialsId: 'aws-jenkins-credentials' 
+        //         ]]) {
+        //             dir("${TERRAFORM_DIR}") {
+        //                 sh '''
+        //                     echo "Applying Terraform plan..."
+        //                     export AWS_DEFAULT_REGION=$AWS_REGION
+        //                     terraform apply -auto-approve tfplan
+        //                 '''
+        //             }
+        //         }
+        //     }
+        // }
 
         stage('Terraform Output') {
             steps {
@@ -94,7 +94,7 @@ pipeline {
             echo "Pipeline failed. Please check the logs."
         }
         success {
-            echo "Terraform deployment completed successfully!"
+            echo "Terraform plan completed successfully!"
         }
     }
 }

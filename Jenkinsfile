@@ -3,12 +3,13 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-1'
-        TERRAFORM_DIR = 'terraform-caps-project/terraform-eks-project'
+        TERRAFORM_DIR = 'terraform-caps-project/terraform-eks-project' // Update this path
     }
 
     stages {
         stage('Checkout') {
             steps {
+                // Checkout the repo with Terraform configurations
                 git 'https://github.com/rajivsharma92/terraform-caps-project.git'
             }
         }
@@ -16,8 +17,9 @@ pipeline {
         stage('Verify Directory Structure') {
             steps {
                 // List files in the top level of the workspace to debug the directory structure
-                sh "ls -al"
-                sh "ls -al terraform-caps-project"
+                sh 'ls -al'
+                sh 'ls -al terraform-caps-project'
+                sh 'ls -al terraform-caps-project/terraform-eks-project'  // Verify if the folder exists
             }
         }
 

@@ -16,6 +16,10 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 script {
+                    // List the contents of the directory to verify if the terraform files exist
+                    sh "ls -al ${TERRAFORM_DIR}"
+
+                    // Check if main.tf exists in the directory
                     if (!fileExists("${TERRAFORM_DIR}/main.tf")) {
                         error("No Terraform configuration found in ${TERRAFORM_DIR}. Please check your repo structure.")
                     }

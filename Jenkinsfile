@@ -8,24 +8,24 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                // Checkout the repo with Terraform configurations
+                // Checkout the correct repository that contains the Terraform configs
                 git 'https://github.com/rajivsharma92/terraform-caps-project.git'
             }
         }
 
         stage('Verify Directory Structure') {
             steps {
-                // Verify the structure after cloning
-                sh 'ls -al'  // Check the top-level files in the repo
-                sh 'ls -al terraform-caps-project'  // Navigate inside the folder
-                sh 'ls -al terraform-caps-project/terraform-eks-project'  // Ensure we are inside the correct folder
+                // Verify the directory structure after checkout
+                sh 'ls -al'  // Verify the root directory structure
+                sh 'ls -al terraform-caps-project'  // Navigate inside 'terraform-caps-project'
+                sh 'ls -al terraform-caps-project/terraform-eks-project'  // Now navigate inside the 'terraform-eks-project' folder
             }
         }
 
         stage('Terraform Init') {
             steps {
                 script {
-                    // Check if terraform-eks-project directory exists
+                    // Ensure terraform-eks-project directory exists and contains main.tf
                     if (!fileExists('terraform-caps-project/terraform-eks-project/main.tf')) {
                         error("No Terraform configuration found in terraform-caps-project/terraform-eks-project. Please check your repo structure.")
                     }

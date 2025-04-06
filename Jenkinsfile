@@ -3,13 +3,25 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-1'
-        TERRAFORM_DIR = 'terraform-caps-project/terraform-eks-project'
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                git url: 'https://github.com/rajivsharma92/terraform-caps-project.git'
+                git url: 'https://github.com/rajivsharma92/terraform-caps-project.git', branch: 'main'
+            }
+        }
+
+        stage('Locate Terraform Directory') {
+            steps {
+                script {
+                    def tfDir = sh(script: "find . -type f -name '*.tf' | head -n 1 | xargs dirname", returnStdout: true).trim()
+                    if (!tfDir) {
+                        error("No Terraform files found in repository.")
+                    }
+                    env.TERRAFORM_DIR = tfDir
+                    echo "Terraform files located in directory: ${env.TERRAFORM_DIR}"
+                }
             }
         }
 
@@ -17,13 +29,12 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-jenkins-credentials'
+                    credentialsId: 'aws-creds'
                 ]]) {
-                    dir("${TERRAFORM_DIR}") {
-                        sh '''
-                            export AWS_DEFAULT_REGION=$AWS_REGION
-                            terraform init -backend-config="bucket=mr-ci-cd" -backend-config="region=$AWS_REGION" -input=false
-                        '''
+                    dir("${env.TERRAFORM_DIR}") {
+                        withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
+                            sh 'terraform init -backend-config="bucket=mr-ci-cd" -backend-config="region=us-east-1" -input=false'
+                        }
                     }
                 }
             }
@@ -33,13 +44,12 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-jenkins-credentials'
+                    credentialsId: 'aws-creds'
                 ]]) {
-                    dir("${TERRAFORM_DIR}") {
-                        sh '''
-                            export AWS_DEFAULT_REGION=$AWS_REGION
-                            terraform plan -out=tfplan
-                        '''
+                    dir("${env.TERRAFORM_DIR}") {
+                        withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
+                            sh 'terraform plan -out=tfplan'
+                        }
                     }
                 }
             }
@@ -47,16 +57,14 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                input message: "Approve to apply?"
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-jenkins-credentials'
+                    credentialsId: 'aws-creds'
                 ]]) {
-                    dir("${TERRAFORM_DIR}") {
-                        sh '''
-                            export AWS_DEFAULT_REGION=$AWS_REGION
-                            terraform apply -auto-approve tfplan
-                        '''
+                    dir("${env.TERRAFORM_DIR}") {
+                        withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
+                            sh 'terraform apply -auto-approve tfplan'
+                        }
                     }
                 }
             }
@@ -66,13 +74,12 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-jenkins-credentials'
+                    credentialsId: 'aws-creds'
                 ]]) {
-                    dir("${TERRAFORM_DIR}") {
-                        sh '''
-                            export AWS_DEFAULT_REGION=$AWS_REGION
-                            terraform output
-                        '''
+                    dir("${env.TERRAFORM_DIR}") {
+                        withEnv(["AWS_DEFAULT_REGION=${AWS_REGION}"]) {
+                            sh 'terraform output'
+                        }
                     }
                 }
             }
@@ -80,14 +87,8 @@ pipeline {
     }
 
     post {
-        success {
-            echo 'Pipeline completed successfully.'
-        }
         failure {
-            echo 'Pipeline failed.'
-        }
-        always {
-            cleanWs()
+            echo 'Pipeline failed. Please check the logs.'
         }
     }
 }

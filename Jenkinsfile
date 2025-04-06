@@ -13,13 +13,18 @@ pipeline {
             }
         }
 
+        stage('Verify Directory Structure') {
+            steps {
+                // List files in the top level of the workspace to debug the directory structure
+                sh "ls -al"
+                sh "ls -al terraform-caps-project"
+            }
+        }
+
         stage('Terraform Init') {
             steps {
                 script {
-                    // List the contents of the directory to verify if the terraform files exist
-                    sh "ls -al ${TERRAFORM_DIR}"
-
-                    // Check if main.tf exists in the directory
+                    // Check if terraform-eks-project directory exists
                     if (!fileExists("${TERRAFORM_DIR}/main.tf")) {
                         error("No Terraform configuration found in ${TERRAFORM_DIR}. Please check your repo structure.")
                     }
@@ -56,24 +61,6 @@ pipeline {
                 }
             }
         }
-
-        // stage('Terraform Apply') {
-        //     steps {
-        //         input message: "Approve apply step?"
-        //         withCredentials([[ 
-        //             $class: 'AmazonWebServicesCredentialsBinding', 
-        //             credentialsId: 'aws-jenkins-credentials' 
-        //         ]]) {
-        //             dir("${TERRAFORM_DIR}") {
-        //                 sh '''
-        //                     echo "Applying Terraform plan..."
-        //                     export AWS_DEFAULT_REGION=$AWS_REGION
-        //                     terraform apply -auto-approve tfplan
-        //                 '''
-        //             }
-        //         }
-        //     }
-        // }
 
         stage('Terraform Output') {
             steps {

@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         AWS_REGION = 'us-east-1'
-        TERRAFORM_DIR = 'terraform-caps-project/terraform-eks-project' // Update this path
     }
 
     stages {
@@ -16,10 +15,10 @@ pipeline {
 
         stage('Verify Directory Structure') {
             steps {
-                // List files in the top level of the workspace to debug the directory structure
-                sh 'ls -al'
-                sh 'ls -al terraform-caps-project'
-                sh 'ls -al terraform-caps-project/terraform-eks-project'  // Verify if the folder exists
+                // Verify the structure after cloning
+                sh 'ls -al'  // Check the top-level files in the repo
+                sh 'ls -al terraform-caps-project'  // Navigate inside the folder
+                sh 'ls -al terraform-caps-project/terraform-eks-project'  // Ensure we are inside the correct folder
             }
         }
 
@@ -27,8 +26,8 @@ pipeline {
             steps {
                 script {
                     // Check if terraform-eks-project directory exists
-                    if (!fileExists("${TERRAFORM_DIR}/main.tf")) {
-                        error("No Terraform configuration found in ${TERRAFORM_DIR}. Please check your repo structure.")
+                    if (!fileExists('terraform-caps-project/terraform-eks-project/main.tf')) {
+                        error("No Terraform configuration found in terraform-caps-project/terraform-eks-project. Please check your repo structure.")
                     }
                 }
 
@@ -36,7 +35,7 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding', 
                     credentialsId: 'aws-jenkins-credentials' 
                 ]]) {
-                    dir("${TERRAFORM_DIR}") {
+                    dir('terraform-caps-project/terraform-eks-project') {
                         sh '''
                             echo "Running terraform init..."
                             export AWS_DEFAULT_REGION=$AWS_REGION
@@ -53,7 +52,7 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding', 
                     credentialsId: 'aws-jenkins-credentials' 
                 ]]) {
-                    dir("${TERRAFORM_DIR}") {
+                    dir('terraform-caps-project/terraform-eks-project') {
                         sh '''
                             echo "Running terraform plan..."
                             export AWS_DEFAULT_REGION=$AWS_REGION
@@ -70,7 +69,7 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding', 
                     credentialsId: 'aws-jenkins-credentials' 
                 ]]) {
-                    dir("${TERRAFORM_DIR}") {
+                    dir('terraform-caps-project/terraform-eks-project') {
                         sh '''
                             echo "Fetching Terraform outputs..."
                             export AWS_DEFAULT_REGION=$AWS_REGION

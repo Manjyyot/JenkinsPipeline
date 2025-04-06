@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         AWS_CREDENTIALS_ID = 'aws-jenkins-credentials'
+        ENVIRONMENT = 'test'  // Set the environment to 'test'
     }
 
     stages {
@@ -25,7 +26,7 @@ pipeline {
 
         stage('Initialize Terraform') {
             steps {
-                dir('terraform-eks-project') {
+                dir('terraform-caps-project/terraform-eks-project') {
                     sh '''
                         # Commented out the S3 backend initialization as per the request
                         # terraform init -backend-config=bucket=mr-ci-cd -backend-config=region=us-east-1 -input=false
@@ -41,16 +42,16 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: env.AWS_CREDENTIALS_ID
                 ]]) {
-                    dir('terraform-eks-project') {
-                        sh '''
+                    dir('terraform-caps-project/terraform-eks-project') {
+                        sh """
                             terraform plan -input=false \
                                 -var="cidr_block=10.0.0.0/16" \
                                 -var="public_subnets=[10.0.1.0/24,10.0.2.0/24]" \
                                 -var="private_subnets=[10.0.3.0/24,10.0.4.0/24]" \
                                 -var="azs=[us-east-1a,us-east-1b]" \
-                                -var="environment=production" \
+                                -var="environment=${env.ENVIRONMENT}" \  // Environment is now 'test'
                                 -var="cluster_name=eks-cluster"
-                        '''
+                        """
                     }
                 }
             }
@@ -62,16 +63,16 @@ pipeline {
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: env.AWS_CREDENTIALS_ID
                 ]]) {
-                    dir('terraform-eks-project') {
-                        sh '''
+                    dir('terraform-caps-project/terraform-eks-project') {
+                        sh """
                             terraform apply -input=false -auto-approve \
                                 -var="cidr_block=10.0.0.0/16" \
                                 -var="public_subnets=[10.0.1.0/24,10.0.2.0/24]" \
                                 -var="private_subnets=[10.0.3.0/24,10.0.4.0/24]" \
                                 -var="azs=[us-east-1a,us-east-1b]" \
-                                -var="environment=production" \
+                                -var="environment=${env.ENVIRONMENT}" \  // Environment is now 'test'
                                 -var="cluster_name=eks-cluster"
-                        '''
+                        """
                     }
                 }
             }
@@ -79,7 +80,7 @@ pipeline {
 
         stage('Terraform Output') {
             steps {
-                dir('terraform-eks-project') {
+                dir('terraform-caps-project/terraform-eks-project') {
                     sh 'terraform output'
                 }
             }

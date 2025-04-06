@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/Manjyyot/JenkinsPipeline.git'
+                git 'https://github.com/rajivsharma92/terraform-caps-project.git'
             }
         }
 
@@ -27,7 +27,9 @@ pipeline {
             steps {
                 dir('terraform-eks-project') {
                     sh '''
-                        terraform init -backend-config=bucket=mr-ci-cd -backend-config=region=us-east-1 -input=false
+                        # Commented out the S3 backend initialization as per the request
+                        # terraform init -backend-config=bucket=mr-ci-cd -backend-config=region=us-east-1 -input=false
+                        terraform init -input=false
                     '''
                 }
             }
